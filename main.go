@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-    "log"
+	"log"
 	"syscall"
 	"time"
 
-    "github.com/containerd/containerd"
-	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/namespaces"
 )
 
@@ -20,6 +20,7 @@ func main() {
 }
 
 func redisExample() error {
+	// create a new client connected to the default socket path for containerd
 	client, err := containerd.New("/run/containerd/containerd.sock")
 	if err != nil {
 		return err
@@ -38,17 +39,18 @@ func redisExample() error {
 	// create a container
 	container, err := client.NewContainer(
 		ctx,
-	 "redis-server",
-		containerd.WithNewSpec(oci.WithImageConfig(image)),
+		"redis-server",
+		containerd.WithImage(image),
 		containerd.WithNewSnapshot("redis-server-snapshot", image),
-    )
+		containerd.WithNewSpec(oci.WithImageConfig(image)),
+	)
 	if err != nil {
 		return err
 	}
 	defer container.Delete(ctx, containerd.WithSnapshotCleanup)
 
 	// create a task from the container
-	task, err := container.NewTask(ctx, cio.NewCreator(cio.Opt(cio.WithStdio)))
+	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
 	if err != nil {
 		return err
 	}
@@ -76,7 +78,11 @@ func redisExample() error {
 	// wait for the process to fully exit and print out the exit status
 
 	status := <-exitStatusC
-	fmt.Printf("redis-server exited with status: %d\n", status)
+	code, _, err := status.Result()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("redis-server exited with status: %d\n", code)
 
 	return nil
 }
